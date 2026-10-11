@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lente de Câmera 3D Interativa - 70-200mm f/2.8 L IS USM</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at center, #0f131a 0%, #07080b 100%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    .hud-header {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .hud-badge {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .hud-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+    }
+    .hud-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+      font-family: monospace;
+      margin-top: 2px;
+    }
+    .controls-panel {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 18px;
+      border-radius: 40px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .btn {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(2, 132, 199, 0.5);
+    }
+    .info-card {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      width: 330px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 18px;
+      border-radius: 12px;
+      z-index: 10;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.7);
+    }
+    .info-category {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 4px;
+      font-family: monospace;
+    }
+    .info-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .info-desc {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .info-specs {
+      font-size: 11px;
+      color: #94a3b8;
+      background: rgba(0,0,0,0.35);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      border-left: 2px solid #38bdf8;
+    }
+    .aperture-indicator {
+      position: absolute;
+      bottom: 88px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #94a3b8;
+      backdrop-filter: blur(8px);
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div class="hud-header">
+    <div class="hud-badge">Óptica Profissional 3D</div>
+    <div class="hud-title">CANON EF 70-200mm f/2.8 L IS USM</div>
+    <div class="hud-subtitle">Refração de Snell · 9 Lâminas · Motor USM · Estabilizador IS</div>
+  </div>
+
+  <div class="aperture-indicator" id="aperture-label">
+    Abertura do Diafragma: f/2.8 (Aberto)
+  </div>
+
+  <div class="controls-panel">
+    <button class="btn" id="btn-explode">
+      <span>💥</span> Explodir
+    </button>
+    <button class="btn active" id="btn-cutaway">
+      <span>✂️</span> Corte Lateral
+    </button>
+    <button class="btn active" id="btn-rays">
+      <span>✨</span> Feixes de Luz
+    </button>
+    <button class="btn active" id="btn-iris">
+      <span>⭕</span> Animar Diafragma
+    </button>
+  </div>
+
+  <div class="info-card" id="info-card">
+    <div class="info-category" id="part-category">Mecânica de Precisão</div>
+    <div class="info-title" id="part-title">Passe o cursor sobre uma peça</div>
+    <div class="info-desc" id="part-desc">Arraste para orbitar, use o scroll para zoom. Pressione Explodir para afastar todos os grupos ópticos e mecânicos ao longo da lente com suas especificações.</div>
+    <div class="info-specs" id="part-specs">Construção: Liga de magnésio e cristal de fluorita CaF2</div>
+  </div>
+
+  <script>
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0c10);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.set(240, 110, 270);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.localClippingEnabled = true;
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxDistance = 650;
+    controls.minDistance = 60;
+    controls.target.set(0, 0, 10);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    keyLight.position.set(150, 220, 160);
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.6);
+    rimLight.position.set(-180, -60, -160);
+    scene.add(rimLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffd166, 0.85);
+    fillLight.position.set(100, -120, -100);
+    scene.add(fillLight);
+
+    const clipPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+
+    const PARTS_DATA = {
+      front_element: {
+        name: 'Elemento Frontal de Fluorita (CaF2 / ED)',
+        cat: 'Óptica',
+        desc: 'Cristal de fluorita artificial com baixíssima dispersão anômala. Elimina aberrações cromáticas e conta com revestimento de flúor anti-oleofóbico.',
+        specs: 'Diâmetro: 77mm · Material: Cristal CaF2 · Revestimento SWC',
+        offset: -170,
+      },
+      red_ring: {
+        name: 'Faixa Vermelha Distintiva (Série L)',
+        cat: 'Chassi',
+        desc: 'Anel de alumínio anodizado vermelho acetinado que identifica as lentes profissionais de luxo da Canon com vedação climática.',
+        specs: 'Liga de alumínio 6061 · Anodização vermelha brilhante',
+        offset: -135,
+      },
+      group1_doublet: {
+        name: 'Dublete Acromático (Crown + Flint)',
+        cat: 'Óptica',
+        desc: 'Vidro Crown e Flint cimentados que corrigem a dispersão e unificam os comprimentos de onda vermelho e azul no mesmo ponto focal.',
+        specs: 'Vidro Crown N-BK7 + Flint SF11 · Cimentação óptica UV',
+        offset: -105,
+      },
+      focus_ring: {
+        name: 'Anel de Foco Manual em Borracha Ranhurada',
+        cat: 'Mecânica',
+        desc: 'Borracha vulcanizada antiderrapante conectada ao sistema Full-Time Manual Focus (FTM), permitindo foco manual sem desarmar o AF.',
+        specs: 'Borracha EPDM com estrias profundas · Curso amortecido',
+        offset: -75,
+      },
+      usm_motor: {
+        name: 'Motor Ultrassônico USM de Anel (Piezoelétrico)',
+        cat: 'Eletrônica',
+        desc: 'Estator piezoelétrico que oscila a 30 kHz impulsionando o rotor por atrito para um foco instantâneo e perfeitamente silencioso.',
+        specs: 'Ressonância: 30-33 kHz · Torque: 0.15 Nm · Resposta: < 35ms',
+        offset: -30,
+      },
+      zoom_cams: {
+        name: 'Tubo Helicoidal e Cames de Zoom em Duralumínio',
+        cat: 'Mecânica',
+        desc: 'Tambor com ranhuras em espiral dupla por onde pinos de rolamento de teflon deslizam, transladando os grupos de zoom internamente.',
+        specs: 'Duralumínio 7075 usinado · Buchas autolubrificantes',
+        offset: 5,
+      },
+      aperture_mechanism: {
+        name: 'Mecanismo do Diafragma (9 Lâminas Circulares)',
+        cat: 'Mecânica',
+        desc: '9 lâminas curvas de liga de carbono flexível acionadas por motor de passo eletromagnético para bokeh circular suave de f/2.8 a f/22.',
+        specs: 'Abertura f/2.8 a f/22 · 9 lâminas curvas · Atuador EMD',
+        offset: 35,
+      },
+      is_stabilizer: {
+        name: 'Estabilizador Óptico de Imagem (IS - 4 Stops)',
+        cat: 'Eletrônica',
+        desc: 'Lente móvel suspensa sobre esferas cerâmicas e 4 bobinas voice-coil que anulam tremores de mão em tempo real com giroscópios MEMS.',
+        specs: 'Compensação: 4 stops · Bobinas magnéticas a 90°',
+        offset: 65,
+      },
+      rear_zoom_group: {
+        name: 'Grupo Óptico Traseiro Asférico (Foco Interno)',
+        cat: 'Óptica',
+        desc: 'Lente asférica de vidro moldado GMo que corrige distorções de campo e aberrações esféricas na saída traseira do feixe.',
+        specs: 'Superfície asférica usinada GMo · Foco interno IF',
+        offset: 95,
+      },
+      zoom_ring: {
+        name: 'Anel de Zoom com Marcas Focais (70-200mm)',
+        cat: 'Mecânica',
+        desc: 'Anel emborrachado largo com gravações brancas de 70mm, 100mm, 135mm e 200mm para controle rápido de enquadramento.',
+        specs: 'Borracha de alta espessura · Marcações gravadas',
+        offset: 120,
+      },
+      tripod_collar: {
+        name: 'Colar de Fixação de Tripé com Sapata Arca-Swiss',
+        cat: 'Chassi',
+        desc: 'Anel articulado com manopla de travamento estriada que permite alternar a câmera entre vertical e horizontal sem soltar o tripé.',
+        specs: 'Liga de magnésio · Trava de rotação de 360°',
+        offset: 140,
+      },
+      rear_mount: {
+        name: 'Baioneta em Aço Inox Cromado e Gaxeta',
+        cat: 'Chassi',
+        desc: 'Encaixe usinado em latão sólido com banho de cromo acetinado, 3 aletas de travamento rígido e gaxeta perimetral de vedação.',
+        specs: 'Latão cromado · Gaxeta de borracha contra chuva',
+        offset: 165,
+      },
+      gold_contacts: {
+        name: 'Contatos Eletrônicos em Ouro Puro 24k (SPI Bus)',
+        cat: 'Eletrônica',
+        desc: '8 pinos elásticos banhados a ouro para transmissão de alta velocidade de autofoco, abertura e dados EXIF com a câmera.',
+        specs: '8 pinos tipo pogo com banho 24k · Barramento digital serial',
+        offset: 185,
+      },
+      camera_sensor: {
+        name: 'Sensor Digital da Câmera (CMOS Full-Frame 35mm)',
+        cat: 'Eletrônica',
+        desc: 'Plano focal traseiro no fundo da câmara escura onde os feixes convergem. Matriz de micro-lentes com filtro de corte dicroico IR-Cut.',
+        specs: 'Área: 36 x 24 mm · Filtro dicroico IR-Cut',
+        offset: 215,
+      }
+    };
+
+    const lensRoot = new THREE.Group();
+    scene.add(lensRoot);
+
+    const partsMap = {};
+    const interactiveMeshes = [];
+    const bladeMeshes = [];
+
+    function makeChassisMat(color, roughness, metalness) {
+      return new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: roughness || 0.35,
+        metalness: metalness || 0.88,
+        clippingPlanes: [clipPlane],
+        clipShadows: true,
+      });
+    }
+
+    function makeGlassMat(tint) {
+      return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transmission: 0.98,
+        opacity: 1,
+        transparent: true,
+        roughness: 0.02,
+        metalness: 0.02,
+        ior: 1.52,
+        reflectivity: 0.85,
+        specularColor: new THREE.Color(tint || 0x86efac),
+        iridescence: 0.8,
+        iridescenceIOR: 1.33,
+        clippingPlanes: [clipPlane],
+      });
+    }
+
+    function registerComp(id, group, baseZ) {
+      const data = PARTS_DATA[id];
+      if (!data) return;
+      group.userData = {
+        id: id,
+        basePos: new THREE.Vector3(0, 0, baseZ),
+        expPos: new THREE.Vector3(0, 0, baseZ + data.offset),
+      };
+      group.position.copy(group.userData.basePos);
+      group.traverse(c => {
+        if (c.isMesh) {
+          c.userData.partId = id;
+          interactiveMeshes.push(c);
+        }
+      });
+      partsMap[id] = group;
+      lensRoot.add(group);
+    }
+
+    // Elemento Frontal
+    const gFront = new THREE.Group();
+    const frontGlassGeo = new THREE.SphereGeometry(37, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.38);
+    frontGlassGeo.scale(1, 1, 0.3);
+    frontGlassGeo.rotateX(Math.PI);
+    gFront.add(new THREE.Mesh(frontGlassGeo, makeGlassMat(0x6ee7b7)));
+    const frontRimGeo = new THREE.CylinderGeometry(44.2, 44.2, 18, 48, 1, true);
+    frontRimGeo.rotateX(Math.PI / 2);
+    gFront.add(new THREE.Mesh(frontRimGeo, makeChassisMat(0x18181b, 0.28, 0.9)));
+    registerComp('front_element', gFront, -120);
+
+    // Faixa Vermelha
+    const gRed = new THREE.Group();
+    const redMat = new THREE.MeshStandardMaterial({
+      color: 0xd90429,
+      roughness: 0.16,
+      metalness: 0.95,
+      emissive: 0x490510,
+      emissiveIntensity: 0.22,
+      clippingPlanes: [clipPlane],
+    });
+    const redGeo = new THREE.CylinderGeometry(44.4, 44.4, 4.5, 48, 1, false);
+    redGeo.rotateX(Math.PI / 2);
+    gRed.add(new THREE.Mesh(redGeo, redMat));
+    registerComp('red_ring', gRed, -112);
+
+    // Dublete
+    const gDub = new THREE.Group();
+    const dub1 = new THREE.SphereGeometry(33, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.35);
+    dub1.scale(1, 1, 0.26);
+    gDub.add(new THREE.Mesh(dub1, makeGlassMat(0x93c5fd)));
+    registerComp('group1_doublet', gDub, -90);
+
+    // Anel de Foco
+    const gFoc = new THREE.Group();
+    const focGeo = new THREE.CylinderGeometry(44.0, 44.0, 26, 48, 1, true);
+    focGeo.rotateX(Math.PI / 2);
+    gFoc.add(new THREE.Mesh(focGeo, makeChassisMat(0x222225, 0.85, 0.08)));
+    registerComp('focus_ring', gFoc, -65);
+
+    // Motor USM
+    const gUSM = new THREE.Group();
+    const statGeo = new THREE.CylinderGeometry(39.8, 39.8, 12, 36, 1, true);
+    statGeo.rotateX(Math.PI / 2);
+    gUSM.add(new THREE.Mesh(statGeo, makeChassisMat(0x94a3b8, 0.25, 0.92)));
+    const coilMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.95, roughness: 0.2, clippingPlanes: [clipPlane] });
+    const coilGeo = new THREE.TorusGeometry(37.2, 1.3, 12, 36);
+    gUSM.add(new THREE.Mesh(coilGeo, coilMat));
+    registerComp('usm_motor', gUSM, -25);
+
+    // Cames Zoom
+    const gCam = new THREE.Group();
+    const camMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.25, clippingPlanes: [clipPlane] });
+    const camGeo = new THREE.CylinderGeometry(38.8, 38.8, 24, 36, 1, true);
+    camGeo.rotateX(Math.PI / 2);
+    gCam.add(new THREE.Mesh(camGeo, camMat));
+    registerComp('zoom_cams', gCam, 2);
+
+    // Diafragma
+    const gIris = new THREE.Group();
+    const irisRimGeo = new THREE.RingGeometry(24, 38, 36);
+    gIris.add(new THREE.Mesh(irisRimGeo, makeChassisMat(0x18181b, 0.35, 0.85)));
+
+    const bShape = new THREE.Shape();
+    bShape.moveTo(0, 0);
+    bShape.bezierCurveTo(4, 12, 16, 20, 26, 18);
+    bShape.bezierCurveTo(24, 10, 16, 4, 8, 0);
+    bShape.closePath();
+    const bGeo = new THREE.ShapeGeometry(bShape);
+    bGeo.scale(0.88, 0.88, 0.88);
+
+    const bMat = new THREE.MeshStandardMaterial({
+      color: 0x121214,
+      metalness: 0.92,
+      roughness: 0.22,
+      side: THREE.DoubleSide,
+      clippingPlanes: [clipPlane],
+    });
+
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const bCont = new THREE.Group();
+      bCont.position.set(Math.cos(a) * 25, Math.sin(a) * 25, (i - 4.5) * 0.15);
+      bCont.rotation.z = a + Math.PI * 0.35;
+      const bMesh = new THREE.Mesh(bGeo, bMat);
+      bMesh.userData = { baseRotZ: a + Math.PI * 0.35 };
+      bCont.add(bMesh);
+      gIris.add(bCont);
+      bladeMeshes.push(bMesh);
+    }
+    registerComp('aperture_mechanism', gIris, 25);
+
+    // Estabilizador IS
+    const gIS = new THREE.Group();
+    const isLGeo = new THREE.SphereGeometry(22, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.35);
+    isLGeo.scale(1, 1, 0.22);
+    gIS.add(new THREE.Mesh(isLGeo, makeGlassMat(0xa5f3fc)));
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2;
+      const cMesh = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 4, 12), coilMat);
+      cMesh.position.set(Math.cos(a) * 31, Math.sin(a) * 31, 0);
+      gIS.add(cMesh);
+    }
+    registerComp('is_stabilizer', gIS, 55);
+
+    // Grupo Traseiro
+    const gRear = new THREE.Group();
+    const rLGeo = new THREE.SphereGeometry(24, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.4);
+    rLGeo.scale(1, 1, 0.25);
+    rLGeo.rotateX(Math.PI);
+    gRear.add(new THREE.Mesh(rLGeo, makeGlassMat(0xc4b5fd)));
+    registerComp('rear_zoom_group', gRear, 85);
+
+    // Anel de Zoom
+    const gZRing = new THREE.Group();
+    const zrGeo = new THREE.CylinderGeometry(44.4, 44.4, 28, 48, 1, true);
+    zrGeo.rotateX(Math.PI / 2);
+    gZRing.add(new THREE.Mesh(zrGeo, makeChassisMat(0x222225, 0.85, 0.08)));
+    registerComp('zoom_ring', gZRing, 108);
+
+    // Colar de Tripé
+    const gCollar = new THREE.Group();
+    const colRing = new THREE.Mesh(new THREE.CylinderGeometry(45.2, 45.2, 14, 48, 1, true), makeChassisMat(0x27272a, 0.28, 0.92));
+    colRing.rotateX(Math.PI / 2);
+    gCollar.add(colRing);
+    const colFoot = new THREE.Mesh(new THREE.BoxGeometry(22, 16, 40), makeChassisMat(0x1e2024, 0.32, 0.9));
+    colFoot.position.set(0, -52, 0);
+    gCollar.add(colFoot);
+    registerComp('tripod_collar', gCollar, 130);
+
+    // Baioneta
+    const gMnt = new THREE.Group();
+    const mntMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.98, roughness: 0.1, clippingPlanes: [clipPlane] });
+    const mntGeo = new THREE.CylinderGeometry(36, 42.5, 10, 48, 1, false);
+    mntGeo.rotateX(Math.PI / 2);
+    gMnt.add(new THREE.Mesh(mntGeo, mntMat));
+    registerComp('rear_mount', gMnt, 155);
+
+    // Contatos Ouro
+    const gGold = new THREE.Group();
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.98, roughness: 0.1, emissive: 0x92400e, emissiveIntensity: 0.25, clippingPlanes: [clipPlane] });
+    for (let i = 0; i < 8; i++) {
+      const a = -Math.PI * 0.26 + (i / 7) * (Math.PI * 0.52);
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 2.5, 8), goldMat);
+      pin.position.set(Math.cos(a) * 26.5, Math.sin(a) * 26.5, 0);
+      pin.rotateX(Math.PI / 2);
+      gGold.add(pin);
+    }
+    registerComp('gold_contacts', gGold, 168);
+
+    // Sensor CMOS
+    const gSens = new THREE.Group();
+    const sensDieMat = new THREE.MeshStandardMaterial({ color: 0x064e3b, metalness: 0.8, roughness: 0.2, emissive: 0x059669, emissiveIntensity: 0.3, clippingPlanes: [clipPlane] });
+    const die = new THREE.Mesh(new THREE.PlaneGeometry(36, 24), sensDieMat);
+    die.rotateY(Math.PI);
+    gSens.add(die);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(56, 44, 10), makeChassisMat(0x111113, 0.38, 0.82));
+    box.position.z = 4;
+    gSens.add(box);
+    registerComp('camera_sensor', gSens, 195);
+
+    // Feixes de Luz e Cones Volumétricos
+    const raysGroup = new THREE.Group();
+    scene.add(raysGroup);
+
+    const colors = [0xff2a55, 0xff9900, 0x22ee77, 0x00d4ff, 0x4361ee];
+
+    function rebuildRays(apertureNorm) {
+      while(raysGroup.children.length > 0) {
+        raysGroup.remove(raysGroup.children[0]);
+      }
+
+      const rIrisMax = 24 * (0.18 + 0.82 * apertureNorm);
+
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.12,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+
+      const inCyl = new THREE.Mesh(new THREE.CylinderGeometry(34, 34, 120, 32, 1, true), beamMat);
+      inCyl.rotateX(Math.PI / 2);
+      inCyl.position.z = -180;
+      raysGroup.add(inCyl);
+
+      const cone1 = new THREE.Mesh(new THREE.CylinderGeometry(rIrisMax, 34, 145, 32, 1, true), beamMat);
+      cone1.rotateX(Math.PI / 2);
+      cone1.position.z = -47.5;
+      raysGroup.add(cone1);
+
+      const cone2 = new THREE.Mesh(new THREE.CylinderGeometry(1.5, rIrisMax, 170, 32, 1, true), beamMat);
+      cone2.rotateX(Math.PI / 2);
+      cone2.position.z = 110;
+      raysGroup.add(cone2);
+
+      colors.forEach((col, cIdx) => {
+        [-28, -14, 0, 14, 28].forEach((rY) => {
+          [-28, 0, 28].forEach((rX) => {
+            const rad = Math.sqrt(rX*rX + rY*rY);
+            if (rad > 32) return;
+
+            const p0 = new THREE.Vector3(rX, rY, -240);
+            const p1 = new THREE.Vector3(rX, rY, -120);
+            const p2 = new THREE.Vector3(rX * 0.86, rY * 0.86, -90);
+            const p3 = new THREE.Vector3(rX * 0.76, rY * 0.76, -20);
+
+            const rIris = rad * 0.62;
+            if (rIris > rIrisMax) {
+              const pBlocked = new THREE.Vector3(rX * 0.62, rY * 0.62, 25);
+              const geo = new THREE.BufferGeometry().setFromPoints([p0, p1, p2, p3, pBlocked]);
+              const mat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending });
+              raysGroup.add(new THREE.Line(geo, mat));
+              return;
+            }
+
+            const p4 = new THREE.Vector3(rX * 0.62, rY * 0.62, 25);
+            const p5 = new THREE.Vector3(rX * 0.48, rY * 0.48, 55);
+            const p6 = new THREE.Vector3(rX * 0.36, rY * 0.36, 85);
+            const pFocus = new THREE.Vector3((cIdx - 2) * 0.9, 0, 195);
+
+            const geo = new THREE.BufferGeometry().setFromPoints([p0, p1, p2, p3, p4, p5, p6, pFocus]);
+            const mat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+            raysGroup.add(new THREE.Line(geo, mat));
+          });
+        });
+      });
+    }
+    rebuildRays(1.0);
+
+    let exploded = false;
+    let explosionProgress = 0;
+    let cutawayActive = true;
+    let animateIris = true;
+    let irisTime = 0;
+    let currentAperture = 1.0;
+
+    const btnExplode = document.getElementById('btn-explode');
+    const btnCutaway = document.getElementById('btn-cutaway');
+    const btnRays = document.getElementById('btn-rays');
+    const btnIris = document.getElementById('btn-iris');
+    const apertureLabel = document.getElementById('aperture-label');
+    const partCat = document.getElementById('part-category');
+    const partTitle = document.getElementById('part-title');
+    const partDesc = document.getElementById('part-desc');
+    const partSpecs = document.getElementById('part-specs');
+
+    btnExplode.addEventListener('click', () => {
+      exploded = !exploded;
+      btnExplode.classList.toggle('active', exploded);
+      btnExplode.innerHTML = exploded ? '<span>🔒</span> Montar' : '<span>💥</span> Explodir';
+    });
+
+    btnCutaway.addEventListener('click', () => {
+      cutawayActive = !cutawayActive;
+      btnCutaway.classList.toggle('active', cutawayActive);
+      clipPlane.constant = cutawayActive ? 0 : 1000;
+    });
+
+    btnRays.addEventListener('click', () => {
+      raysGroup.visible = !raysGroup.visible;
+      btnRays.classList.toggle('active', raysGroup.visible);
+    });
+
+    btnIris.addEventListener('click', () => {
+      animateIris = !animateIris;
+      btnIris.classList.toggle('active', animateIris);
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(-999, -999);
+    let hoveredPartId = null;
+
+    window.addEventListener('pointermove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    function checkHover() {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(interactiveMeshes, false);
+
+      let targetId = null;
+      if (intersects.length > 0) {
+        targetId = intersects[0].object.userData.partId;
+      }
+
+      if (targetId !== hoveredPartId) {
+        if (hoveredPartId && partsMap[hoveredPartId]) {
+          partsMap[hoveredPartId].traverse(c => {
+            if (c.isMesh && c.material && c.material.emissive && c.userData.origEmissive) {
+              c.material.emissive.copy(c.userData.origEmissive);
+              c.material.emissiveIntensity = c.userData.origIntensity;
+              delete c.userData.origEmissive;
+            }
+          });
+        }
+
+        hoveredPartId = targetId;
+
+        if (targetId && partsMap[targetId]) {
+          partsMap[targetId].traverse(c => {
+            if (c.isMesh && c.material && c.material.emissive) {
+              if (!c.userData.origEmissive) {
+                c.userData.origEmissive = c.material.emissive.clone();
+                c.userData.origIntensity = c.material.emissiveIntensity;
+              }
+              c.material.emissive.setHex(0x38bdf8);
+              c.material.emissiveIntensity = 0.65;
+            }
+          });
+
+          const data = PARTS_DATA[targetId];
+          if (data) {
+            partCat.textContent = data.cat;
+            partTitle.textContent = data.name;
+            partDesc.textContent = data.desc;
+            partSpecs.textContent = data.specs;
+          }
+        }
+      }
+    }
+
+    let lastTime = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+
+      controls.update();
+
+      const targetExp = exploded ? 1.0 : 0.0;
+      explosionProgress += (targetExp - explosionProgress) * 0.08;
+
+      Object.values(partsMap).forEach(g => {
+        g.position.lerpVectors(g.userData.basePos, g.userData.expPos, explosionProgress);
+      });
+
+      if (animateIris) {
+        irisTime += delta * 0.8;
+        currentAperture = 0.575 + 0.425 * Math.sin(irisTime);
+
+        const bOffset = (1.0 - currentAperture) * 0.75;
+        bladeMeshes.forEach(b => {
+          b.rotation.z = b.userData.baseRotZ - bOffset;
+        });
+
+        const fStop = (2.8 * Math.pow(Math.SQRT2, (1.0 - currentAperture) * 6)).toFixed(1);
+        apertureLabel.textContent = 'Abertura do Diafragma: f/' + fStop + (currentAperture > 0.8 ? ' (Aberto)' : currentAperture < 0.3 ? ' (Fechado)' : '');
+
+        rebuildRays(currentAperture);
+      }
+
+      checkHover();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

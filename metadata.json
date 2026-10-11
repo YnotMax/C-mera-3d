@@ -1,0 +1,6 @@
+{
+  "name": "Lente de Câmera 3D Interativa",
+  "description": "Exploração 3D detalhada de uma lente fotográfica profissional com corte lateral, física óptica, feixes de luz refratados, diafragma animado e vista explodida interativa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
